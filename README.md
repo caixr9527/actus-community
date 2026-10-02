@@ -90,7 +90,7 @@ FRONTEND_PORT=8080
 PUBLIC_URL=http://localhost:8080
 ```
 
-保存后执行 `docker compose up -d` 生效，访问 **http://localhost:8080**。桌面端配置中的端口也需同步修改。数据库密码应在首次启动前设置，使用字母和数字；已有数据的数据库不能只修改 `.env` 完成密码变更。
+保存后执行 `docker compose up -d` 生效，访问http://localhost:8080。桌面端配置中的端口也需同步修改。数据库密码应在首次启动前设置，使用字母和数字；已有数据的数据库不能只修改 `.env` 完成密码变更。
 
 ## 🔒 HTTPS 部署
 
