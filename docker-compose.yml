@@ -1,0 +1,719 @@
+# 单文件本地部署：docker compose up -d（Docker Compose 2.23.1+）
+# 默认凭据仅供本机使用；镜像可通过 *_IMAGE 覆盖为固定发布版本。
+# 需要包含 Sandbox 地址配置支持的新版 Backend 及已发布的 Sandbox 镜像。
+name: ${COMPOSE_PROJECT_NAME:-actus}
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-bookworm}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-actus}
+      POSTGRES_USER: ${POSTGRES_USER:-actus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-actus-local-postgres}
+    volumes:
+    - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-actus-local-redis}
+    command:
+    - /bin/sh
+    - -ec
+    - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+    volumes:
+    - redis-data:/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  minio:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-actus-local-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-actus-local-minio-password}
+    command:
+    - server
+    - /data
+    - --console-address
+    - :9001
+    volumes:
+    - minio-data:/data
+    ports:
+    - ${MINIO_CONSOLE_BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9000/minio/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  migration:
+    image: ${MIGRATION_IMAGE:-ghcr.io/caixr9527/actus-migration:latest}
+    platform: linux/amd64
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      SQLALCHEMY_DATABASE_URI: postgresql+asyncpg://${POSTGRES_USER:-actus}:${POSTGRES_PASSWORD:-actus-local-postgres}@postgres:5432/${POSTGRES_DB:-actus}
+      ALEMBIC_LOAD_MODEL_METADATA: 'false'
+      MIGRATION_BACKUP_ENABLED: ${MIGRATION_BACKUP_ENABLED:-true}
+      MIGRATION_BACKUP_KEEP: ${MIGRATION_BACKUP_KEEP:-3}
+      MIGRATION_BACKUP_DIR: /backups
+    volumes:
+    - database-backups:/backups
+  init-keys:
+    image: ${POSTGRES_IMAGE:-postgres:16-bookworm}
+    user: 0:0
+    restart: 'no'
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    entrypoint:
+    - /bin/sh
+    - -ec
+    command:
+    - |
+      set -eu
+      umask 077
+      mkdir -p /secrets/service /secrets/connectors
+      exec 9>/secrets/.init.lock
+      flock -x 9
+      if [ ! -e /secrets/credential-master-key ]; then
+        openssl rand -base64 32 > /secrets/credential-master-key.tmp
+        mv /secrets/credential-master-key.tmp /secrets/credential-master-key
+      fi
+      for role in backend worker scheduler gateway; do
+        directory="/secrets/service/$$role"
+        mkdir -p "$$directory"
+        if [ ! -e "$$directory/private-key.pem" ]; then
+          test ! -e "$$directory/public-key.pem" || { echo "Incomplete key pair: $$role" >&2; exit 1; }
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$$directory/private-key.tmp" 2>/dev/null
+          mv "$$directory/private-key.tmp" "$$directory/private-key.pem"
+        fi
+        openssl pkey -in "$$directory/private-key.pem" -pubout -out "$$directory/public-key.tmp" 2>/dev/null
+        if [ -e "$$directory/public-key.pem" ]; then
+          cmp "$$directory/public-key.tmp" "$$directory/public-key.pem"
+          rm "$$directory/public-key.tmp"
+        else
+          mv "$$directory/public-key.tmp" "$$directory/public-key.pem"
+        fi
+      done
+      test "$$(openssl base64 -d -A < /secrets/credential-master-key | wc -c)" -eq 32
+      chown -R 10001:10001 /secrets
+      find /secrets -type d -exec chmod 700 {} +
+      find /secrets -type f -exec chmod 600 {} +
+      echo 'Internal keys ready'
+    volumes:
+    - internal-secrets:/secrets
+  init-db:
+    image: ${POSTGRES_IMAGE:-postgres:16-bookworm}
+    restart: 'no'
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-actus}
+      PGUSER: ${POSTGRES_USER:-actus}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-actus-local-postgres}
+    entrypoint:
+    - /bin/sh
+    - -ec
+    command:
+    - |
+      psql -X -v ON_ERROR_STOP=1 <<'SQL'
+      BEGIN;
+      SELECT pg_advisory_xact_lock(71432026);
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+      INSERT INTO capability_categories (id,code,name,sort_order,enabled,created_at,updated_at)
+      VALUES ('e3280aa6-29b2-469b-aef7-d7f09b09f0ed','other','其他',999,true,now(),now())
+      ON CONFLICT DO NOTHING;
+      WITH seed (
+          id,
+          code,
+          name,
+          description,
+          icon,
+          category_code,
+          category_name,
+          sort_order,
+          provider_key,
+          adapter_key,
+          runtime_kind,
+          auth_kind,
+          supports_pkce,
+          default_scopes,
+          supported_scopes,
+          tool_policy,
+          enabled
+      ) AS (
+          VALUES
+              (
+                  '0f3d55d2-4943-4fe8-84dd-e797b5b3c6c2',
+                  'notion',
+                  'Notion',
+                  $$description$$Search, read, query, comment on, create, update, duplicate, and organize content in your connected Notion workspace.$$description$$,
+                  '/notion.svg',
+                  'productivity',
+                  'Productivity',
+                  10,
+                  'notion',
+                  'notion',
+                  'remote_mcp',
+                  'oauth2_authorization_code',
+                  true,
+                  '["default"]'::jsonb,
+                  '["default"]'::jsonb,
+                  $$json$${
+                      "operation_summary": [
+                          "Search workspace content",
+                          "Read pages and databases",
+                          "Find users and teamspaces",
+                          "Query database views",
+                          "Read and add comments",
+                          "Create pages with approval",
+                          "Update pages with approval",
+                          "Move and duplicate pages with approval"
+                      ]
+                  }$$json$$::jsonb,
+                  true
+              ),
+              (
+                  'ae8e0e12-7898-4a7a-aa1f-fdfb00e3272e',
+                  'tencent-docs',
+                  '腾讯文档',
+                  $$description$$Work with files, spaces, documents, spreadsheets, smart sheets, smart canvases, and slides in your connected Tencent Docs account.$$description$$,
+                  '/tencent-docs.svg',
+                  'productivity',
+                  'Productivity',
+                  20,
+                  'tencent_docs',
+                  'tencent_docs',
+                  'remote_mcp',
+                  'personal_access_token',
+                  false,
+                  '["default"]'::jsonb,
+                  '["default"]'::jsonb,
+                  $$json$${
+                      "setup_url": "https://docs.qq.com/open/auth/mcp.html",
+                      "operation_summary": [
+                          "List recent personal files",
+                          "Search Tencent Docs files",
+                          "List Tencent Docs spaces",
+                          "Browse knowledge-space nodes",
+                          "Read document content",
+                          "Create Markdown documents with approval",
+                          "Edit Word documents and spreadsheets with approval",
+                          "Manage smart sheets and common slide operations with approval"
+                      ]
+                  }$$json$$::jsonb,
+                  true
+              ),
+              (
+                  '7b55c4a2-8f31-4a76-b9d2-6e0fc8a14d93',
+                  'baidu-netdisk',
+                  '百度网盘',
+                  $$description$$List, search, inspect, and download files from the connected Baidu Netdisk application directory.$$description$$,
+                  '/baidu-netdisk.svg',
+                  'storage',
+                  'Storage',
+                  30,
+                  'baidu_netdisk',
+                  'baidu_netdisk',
+                  'rest_api',
+                  'oauth2_authorization_code',
+                  false,
+                  '["basic", "netdisk"]'::jsonb,
+                  '["basic", "netdisk"]'::jsonb,
+                  $$json$${
+                      "operation_summary": [
+                          "List files in the Actus application directory",
+                          "Search files by name",
+                          "Read file metadata",
+                          "Download files into session artifacts"
+                      ]
+                  }$$json$$::jsonb,
+                  true
+              )
+      )
+      INSERT INTO connector_definitions (
+          id,
+          code,
+          name,
+          description,
+          icon,
+          category_code,
+          category_name,
+          sort_order,
+          provider_key,
+          adapter_key,
+          runtime_kind,
+          auth_kind,
+          supports_pkce,
+          default_scopes,
+          supported_scopes,
+          tool_policy,
+          enabled,
+          created_at,
+          updated_at
+      )
+      SELECT
+          id,
+          code,
+          name,
+          description,
+          icon,
+          category_code,
+          category_name,
+          sort_order,
+          provider_key,
+          adapter_key,
+          runtime_kind,
+          auth_kind,
+          supports_pkce,
+          default_scopes,
+          supported_scopes,
+          tool_policy,
+          enabled,
+          CURRENT_TIMESTAMP(0),
+          CURRENT_TIMESTAMP(0)
+      FROM seed
+      ON CONFLICT DO NOTHING;
+      INSERT INTO llm_model_configs (id,provider,display_name,base_url,api_key,model_name,enabled,sort_order,is_default,config,created_at,updated_at)
+      SELECT 'de1d9030-6946-45ae-a053-b0b47b3e8e03','Deepseek','deepseek-v4-flash','https://api.deepseek.com/','','deepseek-v4-flash',true,0,
+             NOT EXISTS (SELECT 1 FROM llm_model_configs WHERE is_default),
+             '{"deepagents":{"model_profile":{"max_input_tokens":1000000},"harness_profile":{"rubric_grader_output_mode":"json_mode"},"provider_profile":{"init_kwargs":{"stream_usage":true}}},"max_tokens":131072,"temperature":1,"capabilities":{"supported":[],"multimodal":false}}'::jsonb,now(),now()
+      WHERE NOT EXISTS (SELECT 1 FROM llm_model_configs WHERE model_name='deepseek-v4-flash')
+      ON CONFLICT DO NOTHING;
+      COMMIT;
+      SQL
+  init-storage:
+    image: ${MINIO_CLIENT_IMAGE:-quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z}
+    restart: 'no'
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-actus-local-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-actus-local-minio-password}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-actus}
+    entrypoint:
+    - /bin/sh
+    - -ec
+    command:
+    - |
+      set -eu
+      mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null
+      mc mb --ignore-existing "local/$$OBJECT_STORAGE_BUCKET"
+      mc anonymous set none "local/$$OBJECT_STORAGE_BUCKET"
+      echo 'Object storage ready'
+  sandbox:
+    image: ${SANDBOX_IMAGE:-ghcr.io/caixr9527/actus-sandbox:latest}
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      init-db:
+        condition: service_completed_successfully
+      init-keys:
+        condition: service_completed_successfully
+      init-storage:
+        condition: service_completed_successfully
+    shm_size: 2gb
+    ports:
+    - ${SANDBOX_BIND_ADDRESS:-127.0.0.1}:${SANDBOX_PORT:-5678}:8080
+    security_opt:
+    - seccomp:unconfined
+    environment:
+      WORKSPACE: /workspace
+      AIO_SKILLS_PATH: /workspace/.skills/
+      ACTUS_MCP_MANIFEST: /workspace/.actus/mcp/mcp.json
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+    - sandbox-workspace:/workspace
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/caixr9527/actus-backend:latest}
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    user: 10001:10001
+    working_dir: /opt/actus
+    depends_on:
+      sandbox:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      ACTUS_LOCAL_START_TIMEOUT: '300'
+      ACTUS_LOCAL_DRAIN_SECONDS: '110'
+      ACTUS_LOCAL_SERVICE_STOP_SECONDS: '70'
+      LOG_DIR: /var/log/actus
+      SQL_LOG_ENABLED: ${SQL_LOG_ENABLED:-false}
+      REDIS_HOST: redis
+      CONNECTOR_GATEWAY_URL: http://127.0.0.1:23144
+      CONNECTOR_GATEWAY_TRUSTED_ISSUERS: actus-backend,actus-worker,actus-scheduler
+      CONNECTOR_GATEWAY_TRUSTED_ROLES: backend,worker,scheduler
+      CONNECTOR_BACKEND_TRUSTED_CONNECTOR_GATEWAY_ISSUER: actus-connector-gateway
+      CONNECTOR_BACKEND_INTERNAL_URL: http://127.0.0.1:23140
+      CONNECTOR_CREDENTIAL_MASTER_KEY_FILE: /run/secrets/credential-master-key
+      CONNECTOR_SYSTEM_SECRETS_DIR: /run/secrets/connectors
+      CONNECTOR_GATEWAY_ARTIFACT_SIGNING_KEY_FILE: /run/secrets/service/gateway/private-key.pem
+      CONNECTOR_BACKEND_TRUSTED_CONNECTOR_GATEWAY_PUBLIC_KEY_FILE: /run/secrets/service/gateway/public-key.pem
+      CONNECTOR_GATEWAY_TRUSTED_PUBLIC_KEY_FILES: /run/secrets/service/backend/public-key.pem,/run/secrets/service/worker/public-key.pem,/run/secrets/service/scheduler/public-key.pem
+      ACTUS_ROLE_API__CONNECTOR_GATEWAY_CALLER_ID: actus-backend
+      ACTUS_ROLE_API__CONNECTOR_GATEWAY_CALLER_ROLE: backend
+      ACTUS_ROLE_API__CONNECTOR_GATEWAY_SIGNING_KEY_FILE: /run/secrets/service/backend/private-key.pem
+      ACTUS_ROLE_WORKER__CONNECTOR_GATEWAY_CALLER_ID: actus-worker
+      ACTUS_ROLE_WORKER__CONNECTOR_GATEWAY_CALLER_ROLE: worker
+      ACTUS_ROLE_WORKER__CONNECTOR_GATEWAY_SIGNING_KEY_FILE: /run/secrets/service/worker/private-key.pem
+      ACTUS_ROLE_SCHEDULER__CONNECTOR_GATEWAY_CALLER_ID: actus-scheduler
+      ACTUS_ROLE_SCHEDULER__CONNECTOR_GATEWAY_CALLER_ROLE: scheduler
+      ACTUS_ROLE_SCHEDULER__CONNECTOR_GATEWAY_SIGNING_KEY_FILE: /run/secrets/service/scheduler/private-key.pem
+      ENV: dev
+      SQLALCHEMY_DATABASE_URI: postgresql+asyncpg://${POSTGRES_USER:-actus}:${POSTGRES_PASSWORD:-actus-local-postgres}@postgres:5432/${POSTGRES_DB:-actus}
+      REDIS_PORT: '6379'
+      REDIS_DB: '0'
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-actus-local-redis}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-actus-local-jwt-change-for-shared-hosts}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_REQUIRE_HTTPS: ${AUTH_REQUIRE_HTTPS:-false}
+      WORKING_CONTEXT_CAPACITY_TOKENS: '200000'
+      WORKING_CONTEXT_TRIGGER_TOKENS: '160000'
+      WORKING_CONTEXT_KEEP_TOKENS: '80000'
+      SANDBOX_RUNTIME_PROVIDER: local
+      AGENT_INFRA_SANDBOX_BASE_URL: http://sandbox:8080
+      AGENT_INFRA_SANDBOX_TIMEOUT_SECONDS: ${AGENT_INFRA_SANDBOX_TIMEOUT_SECONDS:-30}
+      AGENT_INFRA_SANDBOX_PUBLIC_BASE_URL: ${SANDBOX_PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${SANDBOX_PORT:-5678}}
+      OBJECT_STORAGE_BACKEND: s3
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_REGION: us-east-1
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-actus}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-actus-local-minio}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-actus-local-minio-password}
+      OBJECT_STORAGE_ADDRESSING_STYLE: path
+      SKILL_PACKAGES_PREFIX: builtin-skills
+      NOTIFICATION_CONFIG_ENCRYPTION_KEY: ${NOTIFICATION_CONFIG_ENCRYPTION_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      NOTIFICATION_PUBLIC_BASE_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-3000}}
+      CONNECTOR_FRONTEND_PUBLIC_BASE_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-3000}}
+      CONNECTOR_BACKEND_PUBLIC_BASE_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-3000}}
+      DESKTOP_AUTH_FRONTEND_PUBLIC_BASE_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-3000}}
+    entrypoint:
+    - /bin/bash
+    - /run/compose/backend-all.sh
+    command: []
+    configs:
+    - source: backend-start
+      target: /run/compose/backend-all.sh
+    - source: backend-health
+      target: /run/compose/backend-health.sh
+    volumes:
+    - internal-secrets:/run/secrets:ro
+    - backend-logs:/var/log/actus
+    healthcheck:
+      test:
+      - CMD
+      - /bin/bash
+      - /run/compose/backend-health.sh
+      interval: 15s
+      timeout: 20s
+      retries: 5
+      start_period: 330s
+    stop_grace_period: 200s
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/caixr9527/actus-frontend:latest}
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      sandbox:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:23140
+      FRONTEND_APP_ENV: ${FRONTEND_APP_ENV:-prod}
+    ports:
+    - ${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -q
+      - --spider
+      - http://127.0.0.1:3000/
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+  https:
+    image: ${HTTPS_IMAGE:-nginx:1.28-alpine}
+    profiles: [https]
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    ports:
+    - ${HTTPS_BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:443
+    environment:
+      SANDBOX_HTTPS_ENABLED: ${SANDBOX_HTTPS_ENABLED:-false}
+    # 直接使用内嵌配置，不依赖宿主机上的代理配置或启动脚本。
+    entrypoint: [/bin/sh, -ec]
+    command:
+    - |
+      test -s /etc/actus/tls/fullchain.pem || { echo 'Missing TLS certificate: fullchain.pem' >&2; exit 1; }
+      test -s /etc/actus/tls/privkey.pem || { echo 'Missing TLS private key: privkey.pem' >&2; exit 1; }
+      mkdir -p /etc/actus/enabled
+      rm -f /etc/actus/enabled/sandbox.conf
+      case "$${SANDBOX_HTTPS_ENABLED}" in
+        true)
+          for file in sandbox-fullchain.pem sandbox-privkey.pem; do
+            test -s "/etc/actus/tls/$$file" || { echo "Missing Sandbox TLS file: $$file" >&2; exit 1; }
+          done
+          cp /etc/actus/sandbox-nginx.conf /etc/actus/enabled/sandbox.conf
+          ;;
+        false) ;;
+        *) echo 'SANDBOX_HTTPS_ENABLED must be true or false' >&2; exit 1 ;;
+      esac
+      nginx -t -c /etc/actus/nginx.conf
+      exec nginx -c /etc/actus/nginx.conf -g 'daemon off;'
+    volumes:
+    - type: bind
+      source: ${TLS_CERT_DIR:-./certs}
+      target: /etc/actus/tls
+      read_only: true
+      bind:
+        create_host_path: false
+    configs:
+    - source: https-nginx
+      target: /etc/actus/nginx.conf
+    - source: sandbox-nginx
+      target: /etc/actus/sandbox-nginx.conf
+    healthcheck:
+      test: [CMD-SHELL, 'wget --no-check-certificate -q -O /dev/null https://127.0.0.1/_actus_https_health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  minio-data: {}
+  database-backups: {}
+  internal-secrets: {}
+  sandbox-workspace: {}
+  backend-logs: {}
+configs:
+  https-nginx:
+    content: |
+      worker_processes auto;
+      error_log /dev/stderr warn;
+      events { worker_connections 1024; }
+      http {
+        access_log /dev/stdout;
+        map $$http_upgrade $$connection_upgrade {
+          default upgrade;
+          '' close;
+        }
+        resolver 127.0.0.11 valid=10s ipv6=off;
+        include /etc/actus/enabled/*.conf;
+        server {
+          listen 443 ssl default_server;
+          server_name _;
+          ssl_certificate /etc/actus/tls/fullchain.pem;
+          ssl_certificate_key /etc/actus/tls/privkey.pem;
+          ssl_protocols TLSv1.2 TLSv1.3;
+          client_max_body_size 100m;
+          proxy_http_version 1.1;
+          proxy_set_header Host $$http_host;
+          proxy_set_header X-Real-IP $$remote_addr;
+          proxy_set_header X-Forwarded-For $$remote_addr;
+          # HTTPS 入口自行确定协议，不信任客户端传入的协议头。
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header Upgrade $$http_upgrade;
+          proxy_set_header Connection $$connection_upgrade;
+          location = /_actus_https_health {
+            access_log off;
+            return 200 'ok';
+          }
+          location /api/ {
+            set $$backend http://backend:23140;
+            proxy_pass $$backend$$request_uri;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+          }
+          location / {
+            set $$frontend http://frontend:3000;
+            proxy_pass $$frontend$$request_uri;
+            proxy_read_timeout 300s;
+          }
+        }
+      }
+  sandbox-nginx:
+    content: |
+      server {
+        listen 443 ssl;
+        server_name ${SANDBOX_HTTPS_HOST:-sandbox.localhost};
+        ssl_certificate /etc/actus/tls/sandbox-fullchain.pem;
+        ssl_certificate_key /etc/actus/tls/sandbox-privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        client_max_body_size 100m;
+        location = / {
+          return 404;
+        }
+        location / {
+          set $$sandbox http://sandbox:8080;
+          proxy_pass $$sandbox$$request_uri;
+          proxy_http_version 1.1;
+          proxy_set_header Host $$http_host;
+          proxy_set_header X-Real-IP $$remote_addr;
+          proxy_set_header X-Forwarded-For $$remote_addr;
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header Upgrade $$http_upgrade;
+          proxy_set_header Connection $$connection_upgrade;
+          proxy_buffering off;
+          proxy_cache off;
+          proxy_read_timeout 86400s;
+          proxy_send_timeout 86400s;
+        }
+      }
+  backend-start:
+    content: |
+      #!/usr/bin/env bash
+      # 管理同一容器内的五个业务进程；Sandbox 使用独立服务地址。
+      set -euo pipefail
+      BIN="$${ACTUS_BACKEND_BIN:-/opt/actus/actus-backend}"
+      READY_FILE="$${ACTUS_LOCAL_READY_FILE:-/tmp/actus-local-ready}"
+      PIDS=()
+      NAMES=()
+      DRAIN_PIDS=()
+      SERVICE_PIDS=()
+
+      role_exec() {
+        local role="$$1" prefix key name
+        prefix="ACTUS_ROLE_$$(printf '%s' "$$role" | tr '[:lower:]-' '[:upper:]_')__"
+        # 使用变量赋值而非 eval，保留密码中的美元符号、空格和引号。
+        for key in $$(compgen -A variable ACTUS_ROLE_); do
+          if [[ "$$key" == "$$prefix"* ]]; then
+            name="$${key#"$$prefix"}"
+            export "$$name=$${!key}"
+          fi
+        done
+        for key in $$(compgen -A variable ACTUS_ROLE_); do unset "$$key"; done
+        exec "$$BIN" "$$role"
+      }
+
+      # 单角色入口用于进程管理和配置验证，最终 exec 为原 Nuitka 进程。
+      if [[ "$${1:-}" == role ]]; then
+        role_exec "$$2"
+        exit $$?
+      fi
+
+      alive() { kill -0 "$$1" 2>/dev/null; }
+      stop_group() {
+        local timeout="$$1" pid deadline
+        shift
+        [[ "$$#" -gt 0 ]] || return 0
+        for pid in "$$@"; do kill -TERM "$$pid" 2>/dev/null || true; done
+        deadline=$$((SECONDS + timeout))
+        while (( SECONDS < deadline )); do
+          local running=0
+          for pid in "$$@"; do if alive "$$pid"; then running=1; fi; done
+          [[ "$$running" == 1 ]] || break
+          sleep 1
+        done
+        for pid in "$$@"; do
+          if alive "$$pid"; then
+            echo "[local] 进程 $${pid} 停止超时，强制退出" >&2
+            kill -KILL "$$pid" 2>/dev/null || true
+          fi
+          wait "$$pid" 2>/dev/null || true
+        done
+      }
+      cleanup() {
+        local status=$$?
+        trap - EXIT
+        trap '' TERM INT
+        rm -f "$$READY_FILE"
+        # 先停止接单和后台任务，保留 API、Gateway 供在途任务退出。
+        stop_group "$${ACTUS_LOCAL_DRAIN_SECONDS:-110}" "$${DRAIN_PIDS[@]}"
+        stop_group "$${ACTUS_LOCAL_SERVICE_STOP_SECONDS:-70}" "$${SERVICE_PIDS[@]}"
+        exit "$$status"
+      }
+      trap cleanup EXIT
+      trap 'exit 0' TERM INT
+
+      start() {
+        local role="$$1"
+        # exec 外层 shell，确保记录的 PID 就是业务进程，信号能直接送达。
+        (exec /bin/bash "$$0" role "$$role") &
+        local pid=$$!
+        PIDS+=("$$pid")
+        NAMES+=("$$role")
+        if [[ "$$role" == api || "$$role" == connector-gateway ]]; then
+          SERVICE_PIDS+=("$$pid")
+        else
+          DRAIN_PIDS+=("$$pid")
+        fi
+        echo "[local] 启动 $${role} pid=$${pid}"
+      }
+      check_processes() {
+        local index
+        for index in "$${!PIDS[@]}"; do
+          if ! alive "$${PIDS[$$index]}"; then
+            echo "[local] $${NAMES[$$index]} 意外退出，停止整个 Backend 容器" >&2
+            return 1
+          fi
+        done
+      }
+
+      rm -f "$$READY_FILE"
+      start connector-gateway
+      start api
+      deadline=$$((SECONDS + $${ACTUS_LOCAL_START_TIMEOUT:-300}))
+      until curl --fail --silent --max-time 3 http://127.0.0.1:23140/api/status >/dev/null &&
+            curl --fail --silent --max-time 3 http://127.0.0.1:23144/ready >/dev/null; do
+        check_processes
+        (( SECONDS < deadline )) || { echo '[local] API/Gateway 就绪超时' >&2; exit 1; }
+        sleep 2
+      done
+      start worker
+      start scheduler
+      start notification-worker
+      touch "$$READY_FILE"
+      while true; do
+        check_processes
+        sleep 1
+      done
+  backend-health:
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      [[ -f /tmp/actus-local-ready ]]
+      for endpoint in 23140/api/status 23141/ready 23142/ready 23143/ready 23144/ready; do
+        curl --fail --silent --max-time 3 "http://127.0.0.1:$${endpoint}" >/dev/null
+      done
