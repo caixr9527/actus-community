@@ -301,7 +301,7 @@ services:
       INSERT INTO llm_model_configs (id,provider,display_name,base_url,api_key,model_name,enabled,sort_order,is_default,config,created_at,updated_at)
       SELECT 'de1d9030-6946-45ae-a053-b0b47b3e8e03','Deepseek','deepseek-v4-flash','https://api.deepseek.com/','','deepseek-v4-flash',true,0,
              NOT EXISTS (SELECT 1 FROM llm_model_configs WHERE is_default),
-             '{"deepagents":{"model_profile":{"max_input_tokens":1000000},"harness_profile":{"rubric_grader_output_mode":"json_mode"},"provider_profile":{"init_kwargs":{"stream_usage":true}}},"max_tokens":131072,"temperature":1,"capabilities":{"supported":[],"multimodal":false}}'::jsonb,now(),now()
+             '{"max_input_tokens":1000000,"rubric_grader_output_mode":"json_mode"}'::jsonb,now(),now()
       WHERE NOT EXISTS (SELECT 1 FROM llm_model_configs WHERE model_name='deepseek-v4-flash')
       ON CONFLICT DO NOTHING;
       COMMIT;
