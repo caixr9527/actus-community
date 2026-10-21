@@ -1,7 +1,7 @@
 # 腾讯文档
 
-腾讯文档个人 Token 应用，独立运行于 Actus Connector SDK。当前使用
-`0.0.1b3.dev1` 候选 SDK，仅供隔离开发验证；尚未完成正式依赖交付。
+腾讯文档个人 Token 应用，独立运行于 Actus Connector SDK。应用版本为
+`0.1.1`，固定依赖公开发布的 SDK `0.0.1b3`；不代表已部署或开放生产入口。
 
 ## 范围与契约
 
@@ -37,14 +37,17 @@
 
 ## 开发验证
 
-在新环境显式安装候选 SDK wheel，再安装本项目。候选 wheel 路径由构建者提供，
-不要修改平台正式依赖、锁文件或离线 wheelhouse，不回退官方源：
+在新环境从腾讯镜像安装公开 SDK，再安装本项目。构建使用同版本公开 wheel，
+不使用候选包替代，不回退官方源。以下命令在本应用目录执行：
 
 ```bash
-uv venv /absolute/new-env --python 3.12
+python3.12 -m venv /absolute/new-env
 uv pip install --python /absolute/new-env/bin/python \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple \
-  '/absolute/actus_connector_sdk-0.0.1b3.dev1-py3-none-any.whl[build,serve]'
+  'actus-connector-sdk[build,serve]==0.0.1b3'
+/absolute/new-env/bin/python -m pip download --no-deps --only-binary=:all: \
+  --index-url https://mirrors.cloud.tencent.com/pypi/simple \
+  --dest /absolute/sdk-wheel actus-connector-sdk==0.0.1b3
 uv pip install --python /absolute/new-env/bin/python \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple '.[test]'
 /absolute/new-env/bin/connector check --project pyproject.toml
@@ -52,7 +55,7 @@ uv pip install --python /absolute/new-env/bin/python \
 PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL= \
   /absolute/new-env/bin/connector build --project pyproject.toml \
   --output-dir /absolute/new-delivery \
-  --sdk-wheel /absolute/actus_connector_sdk-0.0.1b3.dev1-py3-none-any.whl
+  --sdk-wheel /absolute/sdk-wheel/actus_connector_sdk-0.0.1b3-py3-none-any.whl
 ```
 
 `tools/generate.py <group>` 从已审阅契约输出补丁，可用 apply_patch 应用。
@@ -60,5 +63,6 @@ PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL=
 重新构建发布；不能运行时替换目录。真实测试需通过外部文件提供专用 Token，
 只操作当轮新建测试对象，并记录核实后的清理结果，不把秘密放入本工程。
 
-候选验证通过后仍需独立授权发布 SDK；等腾讯镜像同步且 wheel、sdist 摘要与
-正式发布产物一致，才可升级平台正式依赖和交付材料。当前包不代表已上线。
+SDK `0.0.1b3` 已公开发布，腾讯镜像的 wheel、sdist 已核对与 PyPI 摘要一致。
+后续 SDK 升级仍须先隔离验证，再独立授权发布、核对镜像，最后更新正式依赖。
+安装已有环境和开放生产入口需要独立授权。

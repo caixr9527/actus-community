@@ -2,6 +2,7 @@
 
 import codecs
 import json
+from importlib.metadata import version
 
 from connector_sdk import AuthorizationRejected, HttpError, OperationRejected
 
@@ -149,7 +150,7 @@ class Session:
             {
                 "protocolVersion": PROTOCOL,
                 "capabilities": {},
-                "clientInfo": {"name": "actus-tencent-docs", "version": "0.1.0"},
+                "clientInfo": {"name": "actus-tencent-docs", "version": version("actus-tencent-docs")},
             },
             1,
         )

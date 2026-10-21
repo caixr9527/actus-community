@@ -262,6 +262,9 @@ async def test_tencent_negotiated_protocol():
     )
     await Session(ctx).initialize()
     assert ctx.calls[0][3]["params"]["protocolVersion"] == "2025-03-26"
+    assert ctx.calls[0][3]["params"]["clientInfo"] == {
+        "name": "actus-tencent-docs", "version": DECLARED.manifest.version
+    }
 
 
 def test_all_nested_input_fields_match_frozen_contracts():
