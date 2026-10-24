@@ -1,0 +1,1 @@
+"""Independent form authorization example."""

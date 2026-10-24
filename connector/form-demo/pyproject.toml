@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=80,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "actus-form-demo"
+version = "0.1.0"
+description = "Independent multi-field authorization example"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["actus-connector-sdk==0.0.1b3", "pydantic>=2.12.4,<3"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "pytest-asyncio>=1,<2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.connector]
+entrypoint = "form_demo.app:App"
+build-files = ["README.md", "src/form_demo/__init__.py", "src/form_demo/app.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
