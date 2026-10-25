@@ -7,5 +7,6 @@
 | --- | --- | --- |
 | 腾讯文档 | [tencent-docs](tencent-docs/README.md) | 0.1.1 / SDK 0.0.1b3，隔离构建及安装调用验证完成，未部署 |
 | 多字段工单示例 | [form-demo](form-demo/README.md) | 0.1.0 / 本地 FormAuth SDK 隔离 API 验证完成，未部署；正式依赖与页面另验 |
+| Notion | [notion](notion/README.md) | 0.1.0 / 本地 OAuth SDK 隔离联调完成，未部署；真实 Notion 与正式依赖另验 |
 
 凭据、开发数据库和安装运行材料不得进入仓库。应用的运行和构建步骤见各自 README。
