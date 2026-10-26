@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actus-notion"
-version = "0.1.0"
+version = "0.1.1"
 description = "Independent Notion Hosted MCP OAuth connector"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["actus-connector-sdk==0.0.1b3", "pydantic>=2.12.4,<3"]
+dependencies = ["actus-connector-sdk==0.0.1b4", "pydantic>=2.12.4,<3"]
 
 [project.optional-dependencies]
 test = ["pytest>=9,<10", "pytest-asyncio>=1,<2"]
@@ -35,3 +35,8 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[[tool.uv.index]]
+name = "tencent"
+url = "https://mirrors.cloud.tencent.com/pypi/simple"
+default = true

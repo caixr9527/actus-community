@@ -143,10 +143,10 @@ async def case(tmp_path, monkeypatch):
 
     async def invoke(connection, name, params):
         return await result.runtime.invoke(
-            name, params, connection_id=connection.connection_id, app_version="0.1.0",
+            name, params, connection_id=connection.connection_id, app_version="0.1.1",
             catalog_revision=declaration.manifest.catalog_revision,
             **metadata("operation.invoke", operation_name=name, app_id="notion",
-                       app_version="0.1.0", catalog_revision=declaration.manifest.catalog_revision,
+                       app_version="0.1.1", catalog_revision=declaration.manifest.catalog_revision,
                        connection_id=str(connection.connection_id)))
 
     result.reopen, result.metadata = reopen, metadata

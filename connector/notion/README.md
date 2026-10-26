@@ -11,11 +11,10 @@ HTTPS 公网源站；Atlas 的 `CONNECTOR_OAUTH_REDIRECT_URI` 必须与该源站
 `/api/connector-oauth/callback` 完全一致。Runtime 使用平台传入并持久恢复的回调地址，
 应用及回调请求不能覆盖它。
 
-候选 SDK 在本地已支持 OAuth，但当前镜像上的同版本 SDK 不保证包含这些能力。
-本应用初始声明沿用 `actus-connector-sdk==0.0.1b3`，现阶段必须使用经过核对的本地候选
-SDK wheel 隔离验证；它不代表正式 SDK 已发布或平台已升级。
+应用版本 `0.1.1`，固定依赖正式 SDK `0.0.1b4`；腾讯镜像的 wheel、sdist 已与
+PyPI 摘要核对一致。依赖升级不自动更新旧应用包、运行实例或既有连接。
 
-在安装了候选 SDK 和本应用的独立环境内，由管理员显式执行一次：
+在安装了正式 SDK 和本应用的独立环境内，由管理员显式执行一次：
 
 ```bash
 python -m notion_connector.registration \
@@ -69,13 +68,13 @@ Manifest 固定声明上述操作。每次调用重新读取远端工具清单�
 
 ## 隔离开发与交付
 
-在临时环境安装候选 SDK 和测试依赖，不改现有工程依赖声明、锁文件或生产构建配置。
-在应用目录内使用 `connector check --project pyproject.toml` 检查，再使用：
+在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b4` 和
+本应用测试依赖，使用应用源码副本和独立输出，不覆盖现有环境。应用目录中执行
+`connector check`；构建可在尚未安装应用时直接执行：
 
 ```bash
-connector build --project pyproject.toml \
-  --sdk-wheel /absolute/path/actus_connector_sdk-0.0.1b3-py3-none-any.whl \
-  --output-dir /tmp/notion-build
+PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL= \
+  connector build
 ```
 
 将 `.connector` 产物交给平台上传、准备和启动，再经可信回调
@@ -93,6 +92,6 @@ Notion 已验收。真实环境需补验：一次性注册及复用、浏览器 
 身份、实际工具 schema/计划权限、分页/异步任务、刷新轮换、重启及本地断开/远端撤销。
 写操作应使用专用测试工作区并核实实际效果及通知。
 
-统一 SDK 升级后还需核对正式版本、腾讯云镜像可拉取性、wheel hash、依赖/锁文件及
-Runtime wheelhouse/profile，重新构建本应用并从全新安装走完整授权、工具审批和执行链路。
+SDK 后续升级仍需核对正式版本、腾讯镜像可拉取性、wheel hash、依赖及
+Runtime wheelhouse/profile，重新构建并验证全新安装、授权、工具审批和执行链路。
 OAuth UI 优化、旧应用迁移、发布及生产验收不包含在本应用交付中。

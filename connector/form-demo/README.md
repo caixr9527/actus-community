@@ -6,10 +6,8 @@
 
 ## SDK 与开发环境
 
-当前仅用于本地开发验证。包含 FormAuth 的本地 SDK 候选包仍使用 `0.0.1b3`
-版本标识；腾讯云镜像中的同版本公开包不包含这项能力，不能仅按版本号判断。
-现阶段保持工程依赖声明不变，显式提供经核实的本地 wheel，并记录其提交号和
-SHA-256。正式发布后统一更新 SDK 要求，再验证镜像安装及正式构建。
+应用版本 `0.1.1`，固定依赖正式 SDK `0.0.1b4`。腾讯镜像的 wheel、sdist 已与
+PyPI 摘要核对一致；示例仍使用模拟厂商，不代表已部署或完成页面验收。
 
 不依赖平台源码、相邻应用或私有配置。以下命令在本工程目录执行，环境、构建
 副本和产物目录均使用新目录；不覆盖现有工程环境：
@@ -18,7 +16,7 @@ SHA-256。正式发布后统一更新 SDK 要求，再验证镜像安装及正�
 python3.12 -m venv /absolute/form-env
 /absolute/form-env/bin/python -m pip install \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple \
-  '/absolute/local-sdk/actus_connector_sdk-0.0.1b3-py3-none-any.whl[build,serve]' \
+  'actus-connector-sdk[build,serve]==0.0.1b4' \
   '.[test]'
 ```
 
@@ -29,19 +27,18 @@ SDK 命令入口为环境中的 `connector`：
 /absolute/form-env/bin/python -m pytest -p no:cacheprovider tests
 ```
 
-`check` 和测试应导入该环境中已安装的应用。修改源码后重新安装应用；如新环境
-误装了镜像旧包，显式以本地 wheel 重新安装 SDK，不修改其他工程依赖文件。
-不要通过 PYTHONPATH 加载 SDK 源码或把候选包当作已发布产物。
+`check` 和测试应导入该环境中已安装的应用。修改源码后重新安装，或一次
+editable 安装；不通过 PYTHONPATH 加载 SDK 源码，不使用候选包覆盖正式依赖。
 
 ## 构建与运行
 
 将本工程复制到新的构建目录并重新安装应用，在副本内构建，避免覆盖原目录产物。
-工具环境与传入的 SDK wheel 必须匹配：
+构建默认核验当前安装的 SDK；从腾讯镜像安装依赖，不自动回退其他源：
 
 ```bash
-/absolute/form-env/bin/connector build --project /absolute/build-copy/pyproject.toml \
-  --output-dir /absolute/new-delivery \
-  --sdk-wheel /absolute/local-sdk/actus_connector_sdk-0.0.1b3-py3-none-any.whl
+PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL= \
+  /absolute/form-env/bin/connector build --project /absolute/build-copy/pyproject.toml \
+  --output-dir /absolute/new-delivery
 ```
 
 安装器把 `.connector` 包中的应用 wheel 和 SDK serve extra 安装到新的运行环境。
@@ -68,5 +65,5 @@ API 验证顺序为安装、启用、使用资格、多字段授权、连接选�
 保留原连接，不自动切换当前账号。响应丢失时核实原事务或连接，不依据历史授权
 结果判断当前连接状态。
 
-当前 Web 和桌面页面仍需多字段表单适配。候选 SDK 的本地联调通过不代表正式
-依赖已升级、真实厂商已验收、页面已验收或应用已部署。
+当前 Web 和桌面页面仍需多字段表单适配。正式 SDK 依赖升级及隔离联调通过，不代表
+真实厂商、页面或生产部署已经验收。
