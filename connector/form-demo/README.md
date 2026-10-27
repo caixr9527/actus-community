@@ -6,7 +6,7 @@
 
 ## SDK 与开发环境
 
-应用版本 `0.1.1`，固定依赖正式 SDK `0.0.1b4`。腾讯镜像的 wheel、sdist 已与
+应用版本 `0.1.2`，固定依赖正式 SDK `0.0.1b5`。腾讯镜像的 wheel、sdist 已与
 PyPI 摘要核对一致；示例仍使用模拟厂商，不代表已部署或完成页面验收。
 
 不依赖平台源码、相邻应用或私有配置。以下命令在本工程目录执行，环境、构建
@@ -16,7 +16,7 @@ PyPI 摘要核对一致；示例仍使用模拟厂商，不代表已部署或完
 python3.12 -m venv /absolute/form-env
 /absolute/form-env/bin/python -m pip install \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple \
-  'actus-connector-sdk[build,serve]==0.0.1b4' \
+  'actus-connector-sdk[build,serve]==0.0.1b5' \
   '.[test]'
 ```
 
@@ -65,5 +65,5 @@ API 验证顺序为安装、启用、使用资格、多字段授权、连接选�
 保留原连接，不自动切换当前账号。响应丢失时核实原事务或连接，不依据历史授权
 结果判断当前连接状态。
 
-当前 Web 和桌面页面仍需多字段表单适配。正式 SDK 依赖升级及隔离联调通过，不代表
-真实厂商、页面或生产部署已经验收。
+Web 和桌面端已补齐通用多字段表单；视觉与原生交互仍需人工验收。SDK 依赖升级
+不代表真实厂商、页面或生产部署已经验收。
