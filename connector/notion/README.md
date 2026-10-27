@@ -11,9 +11,9 @@ HTTP/HTTPS 公开源站，回调复用 API 端口；Atlas 的 `CONNECTOR_OAUTH_R
 `/api/connector-oauth/callback` 完全一致。Runtime 使用平台传入并持久恢复的回调地址，
 应用及回调请求不能覆盖它。
 
-应用版本 `0.1.2`，固定依赖正式 SDK `0.0.1b5`；腾讯镜像的 wheel、sdist 已与
+应用版本 `0.1.3`，固定依赖正式 SDK `0.0.1b6`；腾讯镜像的 wheel、sdist 已与
 PyPI 摘要核对一致。依赖升级不自动更新旧应用包、运行实例或既有连接。
-当前源码的 HTTP 回调适配使用本地候选 SDK 隔离验证，正式依赖与锁文件保持不变，后续发布再统一升级。
+HTTP/HTTPS 回调使用正式 SDK 0.0.1b6；依赖更新不自动切换已有安装、回调或运行环境。
 
 在安装了正式 SDK 和本应用的独立环境内，由管理员显式执行一次：
 
@@ -72,7 +72,7 @@ Manifest 固定声明上述操作。每次调用重新读取远端工具清单�
 
 ## 隔离开发与交付
 
-在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b5` 和
+在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b6` 和
 本应用测试依赖，使用应用源码副本和独立输出，不覆盖现有环境。应用目录中执行
 `connector check`；构建可在尚未安装应用时直接执行：
 
