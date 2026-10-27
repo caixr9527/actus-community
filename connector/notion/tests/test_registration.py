@@ -38,10 +38,12 @@ class Registration:
                 "registration_access_token": "private-registration-token"}
 
 
-def test_registration_exclusive_private_reused_without_network(tmp_path):
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_registration_exclusive_private_reused_without_network(tmp_path, scheme):
     vendor, path = Registration(), tmp_path / "registration.json"
-    callback = "https://backend.test/api/connector-oauth/callback"
+    callback = f"{scheme}://backend.internal:23140/api/connector-oauth/callback"
     assert prepare(callback, path, transport=vendor) == {"client_id": "registered-client"}
+    assert json.loads(path.read_text())["redirect_uri"] == callback
     assert path.stat().st_mode & 0o777 == 0o600
     assert "private-registration-token" not in path.read_text()
     assert prepare(callback, path, transport=lambda *_: pytest.fail("unexpected network")) == {
@@ -76,8 +78,11 @@ def test_untrusted_or_changed_metadata_never_registers(tmp_path, key, value):
     assert not path.exists() and vendor.posts == 0
 
 
-@pytest.mark.parametrize("callback", ["http://backend.test/cb", "https://x.test/cb?x=1",
-                                      "https://u:p@x.test/cb", "https://x.test/cb#fragment"])
+@pytest.mark.parametrize("callback", ["ftp://backend.test/cb", "https://x.test/cb?x=1",
+                                      "https://u:p@x.test/cb", "https://x.test/cb#fragment",
+                                      "http://x.test:0/cb", "http://x.test:65536/cb",
+                                      "http://x.test:bad/cb", "http://x.test/cb?",
+                                      "http://x.test/cb#"])
 def test_invalid_callback_rejected_without_network(tmp_path, callback):
     with pytest.raises(PreparationError):
         prepare(callback, tmp_path / "registration.json",

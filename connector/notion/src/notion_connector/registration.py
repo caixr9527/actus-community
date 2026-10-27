@@ -79,11 +79,11 @@ class Transport:
 def redirect_uri(value):
     try:
         url = urlsplit(value)
-        valid = (url.scheme == "https" and url.hostname and url.username is None
+        valid = (url.scheme in {"http", "https"} and url.hostname and url.username is None
                  and url.password is None and not url.query and not url.fragment
-                 and url.path and "\\" not in value
+                 and url.path and not any(c in value for c in "?#\\")
+                 and (url.port is None or 1 <= url.port <= 65535)
                  and all(ord(c) > 32 and ord(c) != 127 for c in value))
-        _ = url.port
     except ValueError:
         valid = False
     if not valid:

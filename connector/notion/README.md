@@ -6,13 +6,14 @@
 
 ## 安装前准备
 
-平台 OAuth 接入前置已经完成。Backend 的 `CONNECTOR_BACKEND_PUBLIC_BASE_URL` 必须是可信
-HTTPS 公网源站；Atlas 的 `CONNECTOR_OAUTH_REDIRECT_URI` 必须与该源站的
+平台 OAuth 接入前置已经完成。Backend 的 `CONNECTOR_BACKEND_PUBLIC_BASE_URL` 使用显式配置的
+HTTP/HTTPS 公开源站，回调复用 API 端口；Atlas 的 `CONNECTOR_OAUTH_REDIRECT_URI` 必须与该源站的
 `/api/connector-oauth/callback` 完全一致。Runtime 使用平台传入并持久恢复的回调地址，
 应用及回调请求不能覆盖它。
 
 应用版本 `0.1.2`，固定依赖正式 SDK `0.0.1b5`；腾讯镜像的 wheel、sdist 已与
 PyPI 摘要核对一致。依赖升级不自动更新旧应用包、运行实例或既有连接。
+当前源码的 HTTP 回调适配使用本地候选 SDK 隔离验证，正式依赖与锁文件保持不变，后续发布再统一升级。
 
 在安装了正式 SDK 和本应用的独立环境内，由管理员显式执行一次：
 
@@ -21,6 +22,9 @@ python -m notion_connector.registration \
   --redirect-uri https://backend.example.com/api/connector-oauth/callback \
   --output /private/notion/registration.json
 ```
+
+`--redirect-uri` 接受 HTTP/HTTPS，例如 `http://backend.example:23140/api/connector-oauth/callback`。
+登记、平台配置和实际监听须使用同一精确地址；HTTPS 不要求另开 8446 端口。
 
 准备工具检查固定源站的受保护资源和 OAuth 元数据，以 public client、`none`、`default`
 和 PKCE S256 注册客户端。输出文件父目录须预先准备，文件以 `0600` 排他创建；仅保存
