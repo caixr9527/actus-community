@@ -11,11 +11,20 @@ HTTP/HTTPS 公开源站，回调复用 API 端口；Atlas 的 `CONNECTOR_OAUTH_R
 `/api/connector-oauth/callback` 完全一致。Runtime 使用平台传入并持久恢复的回调地址，
 应用及回调请求不能覆盖它。
 
-应用版本 `0.1.3`，固定依赖正式 SDK `0.0.1b6`；腾讯镜像的 wheel、sdist 已与
-PyPI 摘要核对一致。依赖升级不自动更新旧应用包、运行实例或既有连接。
-HTTP/HTTPS 回调使用正式 SDK 0.0.1b6；依赖更新不自动切换已有安装、回调或运行环境。
+当前源码是 `0.1.4.dev0` 动态注册接入候选。依赖元数据仍固定 `0.0.1b6`，但公开的该版本
+尚无 `DynamicOAuthClient`；本候选必须使用平台仓库已完成通用动态注册的 SDK 候选 wheel
+隔离验证，不能直接搭配公开 b6 安装。正式 SDK 发布、依赖升级和 Runtime 离线依赖交付另行安排。
+不覆盖旧 `0.1.3` 包、安装配置、注册文件或连接数据。
 
-在安装了正式 SDK 和本应用的独立环境内，由管理员显式执行一次：
+新候选的普通配置 `values={}`、秘密配置 `secrets={}`，拒绝额外字段，不再手填 `client_id`。
+应用使用通用 SDK `DynamicOAuthClient` 声明固定的 `https://mcp.notion.com/register`，
+以 public client、`none`、`default` 和 PKCE S256 授权。导入、检查、构建、启动、普通查询
+不会发起注册；首次有效且获准的显式连接请求才注册。SDK 按安装加密持久化客户端及绑定，
+并发连接、重启、后续授权和刷新复用同一客户端。注册结果未知时保留原记录并阻止重复注册，
+取消会等待清理，不能通过删除本地数据或重开页面重试。管理员需核实原注册结果后另行处理。
+
+旧 `0.1.3` 的管理员准备工具仍保留在源码中，旧安装继续使用已保存的 `values.client_id`。
+它不随新候选打包，不参与新候选的自动注册。仅维护旧版本时可使用原命令：
 
 ```bash
 python -m notion_connector.registration \
@@ -26,13 +35,9 @@ python -m notion_connector.registration \
 `--redirect-uri` 接受 HTTP/HTTPS，例如 `http://backend.example:23140/api/connector-oauth/callback`。
 登记、平台配置和实际监听须使用同一精确地址；HTTPS 不要求另开 8446 端口。
 
-准备工具检查固定源站的受保护资源和 OAuth 元数据，以 public client、`none`、`default`
-和 PKCE S256 注册客户端。输出文件父目录须预先准备，文件以 `0600` 排他创建；仅保存
-client_id、回调及必要注册元数据，不保存用户 Token 或注册管理 Token。使用输出的
-`values.client_id` 作为安装配置。文件放在源码、构建输入及 Runtime 包之外，备份后持久复用。
-启动、导入、授权开始及服务重启均不会注册客户端；相同文件、回调直接复用。
-注册 POST 失败或结果未知时保留 `registration_unknown`，禁止直接删除文件重试；先由管理员
-核实远端结果。更换回调或客户端需单独登记，不能覆盖现有记录。开发回调也需独立注册。
+旧准备工具的输出以 `0600` 排他创建，仅保存 client_id、回调及必要注册元数据。
+文件放在源码、构建输入及 Runtime 包之外，备份后持久复用；`registration_unknown`
+禁止删除重试。更换回调、迁移旧连接或改用新候选必须单独安排，不猜测关联已有客户端。
 
 ## 授权与身份
 
@@ -72,20 +77,21 @@ Manifest 固定声明上述操作。每次调用重新读取远端工具清单�
 
 ## 隔离开发与交付
 
-在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b6` 和
-本应用测试依赖，使用应用源码副本和独立输出，不覆盖现有环境。应用目录中执行
+在新建环境安装含通用动态注册能力的 SDK 候选 wheel 及 build/serve、应用测试依赖，
+使用应用源码副本和独立输出，不覆盖现有环境。应用目录中执行
 `connector check`；构建可在尚未安装应用时直接执行：
 
 ```bash
 PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL= \
-  connector build
+  connector build --sdk-wheel /absolute/path/to/candidate/actus_connector_sdk-0.0.1b6-py3-none-any.whl
 ```
 
-将 `.connector` 产物交给平台上传、准备和启动，再经可信回调
+候选 `.connector` 只用于隔离平台上传、准备和启动验证，再经可信回调
 授权。独立部署只需要产物、SDK 和安装配置，不导入 backend、atlas、Runtime 或其他应用
 源码。注册文件、测试、临时 CA 和私有配置不进入发布包。
 
-测试覆盖身份、工具参数与权限、增量协议、异常写入及注册复用：
+测试覆盖 SDK 动态注册、未知结果不重发、取消收尾、重启复用、身份、工具参数与权限、
+增量协议、异常写入，并保留旧准备工具的回归：
 
 ```bash
 python -m pytest tests

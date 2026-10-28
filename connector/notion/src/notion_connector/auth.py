@@ -2,14 +2,14 @@
 
 from connector_sdk import (
     AuthorizationRejected,
-    ConfigRef,
+    DynamicOAuthClient,
     ExternalIdentity,
     OAuth2AuthorizationCode,
     VerifiedConnection,
 )
 
 from .mcp import permissions, session
-from .protocol import ORIGIN
+from .protocol import CLIENT_NAME, ORIGIN
 from .schema import validate
 
 
@@ -24,9 +24,11 @@ class Auth(OAuth2AuthorizationCode):
     token_url = ORIGIN + "/token"
     revocation_url = ORIGIN + "/token"
     issuer = ORIGIN
-    client_id = ConfigRef("client_id")
-    client_secret = None
-    token_endpoint_auth_method = "none"
+    client = DynamicOAuthClient(
+        registration_url=ORIGIN + "/register",
+        client_name=CLIENT_NAME,
+        token_endpoint_auth_method="none",
+    )
     scopes = ("default",)
 
     async def resolve_identity(self, ctx):

@@ -14,7 +14,6 @@ from connector_sdk import HttpOptions, JwtPlatformAdapter, assemble_config, load
 from connector_sdk.runtime import Runtime, RuntimeOptions
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-
 from notion_connector.protocol import ORIGIN, PROTOCOL, TOOLS
 
 
@@ -37,9 +36,18 @@ class Vendor:
         self.revocations = []
         self.inject = None
         self.cleanup_fail = False
+        self.registrations = []
+        self.register = None
 
     async def __call__(self, request):
         assert request.url.host == "mcp.notion.com" and request.url.scheme == "https"
+        if request.url.path == "/register":
+            body = json.loads(request.content)
+            self.registrations.append(body)
+            assert "authorization" not in request.headers
+            if self.register:
+                return await self.register(request)
+            return httpx.Response(201, json=body | {"client_id": "registered-client"})
         if request.url.path == "/token":
             form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
             self.forms.append(form)
@@ -106,7 +114,7 @@ async def case(tmp_path, monkeypatch):
     secret = tmp_path / "credential-key"
     secret.write_bytes(os.urandom(32))
     secret.chmod(0o600)
-    configured = assemble_config(declaration, values={"client_id": "registered-client"}, secrets={},
+    configured = assemble_config(declaration, values={}, secrets={},
                                  runtime={"installation_id": uuid4(), "data_dir": tmp_path / "data",
                                           "credential_key_file": secret,
                                           "oauth_redirect_uri":
@@ -143,10 +151,12 @@ async def case(tmp_path, monkeypatch):
 
     async def invoke(connection, name, params):
         return await result.runtime.invoke(
-            name, params, connection_id=connection.connection_id, app_version="0.1.3",
+            name, params, connection_id=connection.connection_id,
+            app_version=declaration.manifest.version,
             catalog_revision=declaration.manifest.catalog_revision,
             **metadata("operation.invoke", operation_name=name, app_id="notion",
-                       app_version="0.1.3", catalog_revision=declaration.manifest.catalog_revision,
+                       app_version=declaration.manifest.version,
+                       catalog_revision=declaration.manifest.catalog_revision,
                        connection_id=str(connection.connection_id)))
 
     result.reopen, result.metadata = reopen, metadata

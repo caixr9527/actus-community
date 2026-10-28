@@ -17,7 +17,7 @@ class Model(BaseModel):
 
 
 class Settings(Model):
-    client_id: str = Field(min_length=1, max_length=4096, pattern=r"^[^\s\x00-\x1f\x7f]+$")
+    pass
 
 
 class Result(Model):
