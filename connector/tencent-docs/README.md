@@ -1,7 +1,7 @@
 # 腾讯文档
 
 腾讯文档个人 Token 应用，独立运行于 Actus Connector SDK。应用版本为
-`0.1.4`，固定依赖公开发布的 SDK `0.0.1b6`；不代表已部署或开放生产入口。
+`0.1.5`，固定依赖公开发布的 SDK `0.0.1b7`；不代表已部署或开放生产入口。
 
 ## 范围与契约
 
@@ -44,7 +44,7 @@
 python3.12 -m venv /absolute/new-env
 uv pip install --python /absolute/new-env/bin/python \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple \
-  'actus-connector-sdk[build,serve]==0.0.1b6'
+  'actus-connector-sdk[build,serve]==0.0.1b7'
 uv pip install --python /absolute/new-env/bin/python \
   --index-url https://mirrors.cloud.tencent.com/pypi/simple '.[test]'
 /absolute/new-env/bin/connector check --project pyproject.toml
@@ -59,6 +59,6 @@ PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL=
 重新构建发布；不能运行时替换目录。真实测试需通过外部文件提供专用 Token，
 只操作当轮新建测试对象，并记录核实后的清理结果，不把秘密放入本工程。
 
-SDK `0.0.1b6` 已公开发布，腾讯镜像的 wheel、sdist 已核对与 PyPI 摘要一致。
+SDK `0.0.1b7` 已公开发布，腾讯镜像的 wheel、sdist 已核对与 PyPI 摘要一致。
 后续 SDK 升级仍须核实正式发布和镜像摘要，更新依赖后再隔离验证。
 安装已有环境和开放生产入口需要独立授权。
