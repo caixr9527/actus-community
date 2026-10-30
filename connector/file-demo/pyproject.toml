@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actus-file-demo"
-version = "0.1.0"
-description = "Independent generic single-file download example"
+version = "0.1.1"
+description = "Independent generic single-file transfer example"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["actus-connector-sdk==0.0.1b8.dev4", "pydantic>=2.12.4,<3"]
+dependencies = ["actus-connector-sdk==0.0.1b8.dev5", "pydantic>=2.12.4,<3"]
 
 [project.optional-dependencies]
 test = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "uvicorn>=0.41,<0.42"]

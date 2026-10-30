@@ -8,6 +8,6 @@
 | 腾讯文档 | [tencent-docs](tencent-docs/README.md) | 0.1.5 / SDK 0.0.1b7；构建、独立安装及隔离测试通过，未部署 |
 | 多字段工单示例 | [form-demo](form-demo/README.md) | 0.1.4 / SDK 0.0.1b7；构建、独立安装及隔离测试通过，UI 与真实厂商另验，未部署 |
 | Notion | [notion](notion/README.md) | 0.1.4 / SDK 0.0.1b7；构建、独立安装及隔离测试通过，真实 Notion 与 UI 另验，未部署 |
-| 通用文件示例 | [file-demo](file-demo/README.md) | 0.1.0 / SDK 候选 0.0.1b8.dev4；固定服务单文件下载、独立包及隔离任务登记链路通过，未发布或部署 |
+| 通用文件示例 | [file-demo](file-demo/README.md) | 0.1.1 / SDK 候选 0.0.1b8.dev5；固定服务单文件上传下载、独立包及隔离任务链路通过，未发布或部署 |
 
 凭据、开发数据库和安装运行材料不得进入仓库。应用的运行和构建步骤见各自 README。
