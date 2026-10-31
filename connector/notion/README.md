@@ -11,7 +11,7 @@ HTTP/HTTPS 公开源站，回调复用 API 端口；Atlas 的 `CONNECTOR_OAUTH_R
 `/api/connector-oauth/callback` 完全一致。Runtime 使用平台传入并持久恢复的回调地址，
 应用及回调请求不能覆盖它。
 
-当前应用版本为 `0.1.4`，固定依赖正式 SDK `0.0.1b7`，通过通用 `DynamicOAuthClient`
+当前应用版本为 `0.1.5`，固定依赖正式 SDK `0.0.1b8`，通过通用 `DynamicOAuthClient`
 接入动态注册。腾讯镜像的 SDK wheel、sdist 已核对与 PyPI 摘要一致；应用构建和独立安装
 使用正式发行依赖，不再使用同版本候选 wheel 覆盖。依赖交付不代表已有实例已切换。
 不覆盖旧 `0.1.3` 包、安装配置、注册文件或连接数据。
@@ -77,7 +77,7 @@ Manifest 固定声明上述操作。每次调用重新读取远端工具清单�
 
 ## 隔离开发与交付
 
-在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b7` 及应用测试依赖，
+在新建环境从腾讯镜像安装 `actus-connector-sdk[build,serve]==0.0.1b8` 及应用测试依赖，
 使用应用源码副本和独立输出，不覆盖现有环境，不回退其他源。应用目录中执行
 `connector check`；构建可在尚未安装应用时直接执行：
 
