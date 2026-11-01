@@ -1,8 +1,8 @@
 # 通用文件示例
 
-独立应用 `file-demo`，版本 `0.1.2`，通过固定服务上传或下载一个文件；下载由平台导入 Artifact。
+独立应用 `file-demo`，版本 `0.1.3`，通过固定服务上传或下载一个文件；下载由平台导入 Artifact。
 适用于任意文件类型；不包含网盘、工单、文档或图片专属协议。服务是明确约定的模拟 API，
-不代表已接入真实厂商。固定依赖正式 SDK `0.0.1b8`；腾讯镜像 wheel/sdist 已与发行摘要核对一致。
+不代表已接入真实厂商。固定依赖正式 SDK `0.0.1b9`；腾讯镜像 wheel/sdist 已与发行摘要核对一致。
 
 ## 配置、授权与操作
 
@@ -71,7 +71,7 @@ empty、binary、unknown；它们分别展示文本、零字节、二进制和�
 ```bash
 python3.12 -m venv /absolute/new-file-env
 /absolute/new-file-env/bin/python -m pip install --index-url https://mirrors.cloud.tencent.com/pypi/simple \
-  'actus-connector-sdk[build,serve]==0.0.1b8'
+  'actus-connector-sdk[build,serve]==0.0.1b9'
 /absolute/new-file-env/bin/python -m pip install --index-url https://mirrors.cloud.tencent.com/pypi/simple '.[test]'
 /absolute/new-file-env/bin/connector check --project pyproject.toml
 /absolute/new-file-env/bin/python -m pytest -p no:cacheprovider tests --basetemp /absolute/new-test-output
@@ -87,6 +87,6 @@ python3.12 -m venv /absolute/new-file-env
 安装运行还需提供 SDK 要求的安装身份、平台公钥、凭据密钥、数据目录及 HTTP 选项。
 测试服务、测试数据、私钥和授权材料不进入发布包。
 
-平台消费依赖同步使用正式 b8；应用包及新镜像在隔离环境验证，现有安装切换与部署
+平台消费依赖同步使用正式 b9；应用包及新镜像在隔离环境验证，现有安装切换与部署
 分别验收；不能用示例通过证明生产文件能力已开放。
 上传、下载各一次只处理一个文件；页面展示、真实厂商、分片及现有安装切换单独推进。
