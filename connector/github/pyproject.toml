@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=80,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "actus-github"
+version = "0.1.0"
+description = "Independent GitHub App user OAuth, issues and pull request connector"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["actus-connector-sdk==0.0.1b9", "pydantic>=2.12.4,<3", "httpx>=0.28,<0.29"]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1"]
+
+[dependency-groups]
+dev = ["actus-connector-sdk[build,serve]==0.0.1b9"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.connector]
+entrypoint = "github_connector.app:App"
+build-files = [
+  "README.md", "src/github_connector/__init__.py", "src/github_connector/app.py",
+  "src/github_connector/auth.py", "src/github_connector/api.py",
+  "src/github_connector/models.py", "src/github_connector/installations.py",
+  "src/github_connector/repositories.py", "src/github_connector/issues.py",
+  "src/github_connector/pulls.py", "src/github_connector/network.py",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[[tool.uv.index]]
+name = "tencent"
+url = "https://mirrors.cloud.tencent.com/pypi/simple"
+default = true

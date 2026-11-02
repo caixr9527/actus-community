@@ -11,6 +11,7 @@
 | 通用文件示例 | [file-demo](file-demo/README.md) | 0.1.3 / SDK 0.0.1b9；固定服务单文件上传下载、独立包及隔离任务链路通过，未部署 |
 | 百度网盘 | [baidu-netdisk](baidu-netdisk/README.md) | 0.1.1 / SDK 0.0.1b9；元数据标记解析修复、95 项测试及声明检查通过，构建、上传和升级由用户执行 |
 | 飞书 | [feishu](feishu/README.md) | 0.1.0 / SDK 0.0.1b9；100 项测试、独立构建安装、TLS 启动及静态复核通过，真实飞书与平台 UI 待验收，未部署 |
+| GitHub | [github](github/README.md) | 0.1.0 / SDK 0.0.1b9；104 项测试、独立构建安装、TLS 启动及静态复核通过，真实 GitHub 与平台 UI 待验收，未部署 |
 
 凭据、开发数据库和安装运行材料不得进入仓库。应用的运行和构建步骤见各自 README。
 
