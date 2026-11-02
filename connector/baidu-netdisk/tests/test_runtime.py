@@ -78,6 +78,51 @@ async def test_directory_without_md5_and_semantic_parent_path_are_preserved(case
     assert reply.data["files"][0]["md5"] is None
 
 
+@pytest.mark.parametrize("marker", ["ABCDEF0123456789" * 2, "A" * 31 + "_"])
+@pytest.mark.parametrize("operation,params", [
+    ("list_files", {"path": "/apps/bdpan"}),
+    ("search_files", {"query": "sample"}),
+    ("semantic_search", {"query": "sample"}),
+    ("get_file_metadata", {"fs_id": "123"}),
+])
+async def test_vendor_file_marker_is_preserved_without_digest_assumptions(
+    case, monkeypatch, marker, operation, params,
+):
+    connection = await case.connect()
+    original = case.vendor.file
+    monkeypatch.setattr(case.vendor, "file", lambda: original() | {"md5": marker})
+    reply = await case.invoke(connection, operation, params)
+    assert reply.status == "succeeded", reply
+    record = reply.data["file"] if operation == "get_file_metadata" else reply.data["files"][0]
+    assert record["md5"] == marker
+
+
+async def test_directory_with_mixed_file_markers_returns_the_entire_page(case):
+    connection = await case.connect()
+    markers = [None, "", "g" * 32, "-" * 32, "_" * 32, "A" * 31 + "_"]
+    records = [case.vendor.file() | {"fs_id": 123 + i, "md5": marker}
+               for i, marker in enumerate(markers)]
+
+    async def inject(request):
+        if request.url.params.get("method") == "list":
+            assert request.url.params["dir"] == "/apps/bdpan"
+            return httpx.Response(200, json={"errno": 0, "list": records})
+
+    case.vendor.inject = inject
+    reply = await case.invoke(connection, "list_files", {"path": "/apps/bdpan", "limit": 100})
+    assert reply.status == "succeeded", reply
+    assert len(reply.data["files"]) == 6
+    assert [item["md5"] for item in reply.data["files"]] == [None, None, *markers[2:]]
+
+
+@pytest.mark.parametrize("marker", [123, True, {"value": "opaque"}])
+async def test_non_string_vendor_file_marker_is_still_rejected(case, monkeypatch, marker):
+    connection = await case.connect()
+    original = case.vendor.file
+    monkeypatch.setattr(case.vendor, "file", lambda: original() | {"md5": marker})
+    assert (await case.invoke(connection, "list_files", {})).status == "failed"
+
+
 @pytest.mark.parametrize("operation,params,payload,field", [
     ("get_quota", {}, {"errno": 0, "total": 100, "used": 40, "free": 51},
      "expires_within_seven_days"),

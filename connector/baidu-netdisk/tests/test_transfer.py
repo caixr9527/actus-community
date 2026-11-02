@@ -97,20 +97,24 @@ async def test_upload_response_loss_never_retries(case, phase):
     assert len(targets) == 1
 
 
-async def test_checksum_failure_stops_merge(case):
+@pytest.mark.parametrize("checksum", ["0" * 32, "A" * 31 + "_"])
+async def test_checksum_failure_stops_merge(case, checksum):
     connection = await case.connect()
 
     async def inject(request):
         if request.url.path.endswith("superfile2"):
-            return httpx.Response(200, json={"md5": "0" * 32})
+            return httpx.Response(200, json={"md5": checksum})
 
     case.vendor.inject = inject
     reply = await upload(case, connection, b"abc")
     assert reply.status == "uncertain" and not case.vendor.creates
 
 
-async def test_download_actual_bytes_metadata_and_close(case):
+@pytest.mark.parametrize("marker", [None, "A" * 31 + "_"])
+async def test_download_actual_bytes_metadata_and_close(case, monkeypatch, marker):
     connection = await case.connect()
+    original = case.vendor.file
+    monkeypatch.setattr(case.vendor, "file", lambda: original() | {"md5": marker})
 
     async def consume(response):
         assert response.external_resource_id == "123"

@@ -156,7 +156,10 @@ class FileRecord(Model):
     category: int | None = Field(default=None, ge=1, le=7)
     modified_at: int | None = Field(default=None, ge=0)
     created_at: int | None = Field(default=None, ge=0)
-    md5: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{32}$")
+    md5: str | None = Field(
+        default=None,
+        description="百度返回的原样文件标记，不保证为十六进制 MD5，不用于上传分片校验。",
+    )
     content: str | None = None
     ocr: str | None = None
 

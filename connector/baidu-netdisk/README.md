@@ -1,6 +1,6 @@
 # 百度网盘
 
-独立的百度网盘 Connector 应用，版本 `0.1.0`，固定使用公开发布的
+独立的百度网盘 Connector 应用，版本 `0.1.1`，固定使用公开发布的
 `actus-connector-sdk==0.0.1b9`。运行不依赖 Backend、Atlas、SDK 源码或其他应用配置。
 
 ## 功能
@@ -21,6 +21,9 @@
 容量的到期标记、文件名搜索的更多结果标记或语义搜索的结束标记未返回时，
 对应字段为 `null`，表示未知，不推断为未到期或搜索已结束。
 目录列表使用起始位置分页，满页时允许继续读取，是否到末尾须结合后续返回确认。
+
+文件元数据中的 `md5` 是百度返回的原样标记，可能包含非十六进制字符，不能当作本地
+内容摘要使用。空值或空字符串仍表示未提供；上传分片继续使用本地计算的 MD5 严格校验。
 
 ## 授权与配置
 
@@ -99,7 +102,7 @@ SDK `connector serve --entrypoint baidu_netdisk.app:App --settings <安装配置
 
 ```sh
 <consumer>/bin/python -I -B <独立测试目录>/acceptance.py \
-  --package <独立目录>/baidu-netdisk-0.1.0.connector \
+  --package <独立目录>/baidu-netdisk-0.1.1.connector \
   --output <独立目录>/acceptance-run
 ```
 
