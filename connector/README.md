@@ -13,6 +13,7 @@
 | 飞书 | [feishu](feishu/README.md) | 0.1.0 / SDK 0.0.1b9；100 项测试、独立构建安装、TLS 启动及静态复核通过，真实飞书与平台 UI 待验收，未部署 |
 | GitHub | [github](github/README.md) | 0.1.0 / SDK 0.0.1b9；104 项测试、独立构建安装、TLS 启动及静态复核通过，真实 GitHub 与平台 UI 待验收，未部署 |
 | 钉钉 | [dingtalk](dingtalk/README.md) | 0.1.0 / SDK 0.0.1b9；122 项测试、独立构建安装、TLS 启动及静态复核通过，真实钉钉与平台 UI 待验收，未部署 |
+| 腾讯会议 | [tencent-meeting](tencent-meeting/README.md) | 0.1.0 / SDK 0.0.1b9；137 项本地测试、独立构建安装、TLS 启动及静态复核通过；授权后线上 Schema、回执与平台 UI 待验收，未部署 |
 
 凭据、开发数据库和安装运行材料不得进入仓库。应用的运行和构建步骤见各自 README。
 
