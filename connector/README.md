@@ -12,3 +12,10 @@
 | 百度网盘 | [baidu-netdisk](baidu-netdisk/README.md) | 0.1.0 / SDK 0.0.1b9；12 项操作、独立构建安装及隔离 TLS 运行通过，真实百度与平台 UI 另验，未部署 |
 
 凭据、开发数据库和安装运行材料不得进入仓库。应用的运行和构建步骤见各自 README。
+
+## 本地开发
+
+各应用的默认 `dev` 依赖组包含 SDK 的 `build` 和 `serve` 工具依赖。
+在相应应用目录执行 `uv sync` 并激活 `.venv` 后，即可直接使用 `connector check`、
+`connector build` 和 `connector serve`，无需额外安装工具依赖。
+测试依赖通过 `uv sync --extra test` 安装；`uv sync --no-dev` 适用于不需要开发工具的环境。
