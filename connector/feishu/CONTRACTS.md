@@ -1,6 +1,7 @@
-# 飞书首版契约依据
+# 飞书契约依据
 
-核对日期：2026-11-02。运行时不读取本文件，不动态发现接口或 scope。
+OAuth 核对日期：2026-11-03；业务 API 核对日期：2026-11-02。
+运行时不读取本文件，不动态发现接口或 scope。
 官方文档页面的正文通过飞书公开 `document_portal/v1/document/get_detail?fullPath=...`
 读取核对；以下记录实现所依赖的路径、身份、字段和语义，不复制完整上游文档。
 
@@ -12,13 +13,19 @@
 - [获取授权码](https://open.feishu.cn/document/common-capabilities/sso/api/obtain-oauth-code)：
   `https://accounts.feishu.cn/open-apis/authen/v1/authorize`，空格分隔 scope，
   state、S256 code_challenge、redirect_uri；用户拒绝返回 access_denied。
-- [获取 Token v3](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3)：
-  `POST https://accounts.feishu.cn/oauth/v3/token`，支持表单编码，机密客户端提供
-  client_id/client_secret；交换传 code、redirect_uri、code_verifier。
-  [历史 v2](https://open.feishu.cn/document/authentication-management/access-token/get-user-access-token)
-  已明确推荐迁移 v3，v3 修正了缺少 challenge 却提供 verifier 的校验语义。
-- [刷新 Token v3](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/refresh-user-access-token-v3)：
+  文档的 code_challenge 说明 PKCE 可暂时搭配 v2 Token，最新端点的支持仍待后续提供。
+- [获取 Token v2](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token)：
+  `POST https://open.feishu.cn/open-apis/authen/v2/oauth/token`，请求头声明
+  `application/json; charset=utf-8`，机密客户端在 JSON 体提供 client_id/client_secret；
+  交换传 code、redirect_uri、code_verifier。使用公开 OAuthRequest 与 authenticate 适配编码。
+  该文档虽推荐 v3，但授权入口的 PKCE 兼容说明仍指定 v2；0.1.1 现场收到 v3 的
+  HTTP 400 / 20049，只能确认 PKCE 失败，尚未证明服务端内部原因。
+  v2 文档同时指出缺少 challenge 却提交 verifier 时可能不拒绝请求。应用继续强制
+  SDK S256 流程；真实厂商的正向与错误 verifier 对照仍需使用全新授权码分别验收，
+  不能将 mock 的严格拒绝或 v2 正向成功当作厂商严格执行 PKCE 的证据。
+- [刷新 Token v2](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/refresh-user-access-token)：
   同一 Token 端点，grant_type=refresh_token。刷新凭据只能使用一次。
+  与交换一致使用 JSON 请求体，仅刷新 v2 接口下发的凭据，不混用 v3 刷新凭据。
   offline_access 控制 refresh_token 及其有效期返回；不硬编码两类 Token 的到期秒数。
 - 成功字段：access_token、token_type=Bearer、expires_in、refresh_token、
   refresh_token_expires_in、scope。实际 scope 可能被裁剪，不能按请求 scope 推断授权。

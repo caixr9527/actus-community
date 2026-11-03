@@ -1,4 +1,4 @@
-"""Feishu OAuth v3 with SDK-owned state, S256, refresh rotation and encrypted storage."""
+"""Feishu PKCE-compatible OAuth with SDK-owned state, rotation and encrypted storage."""
 
 import asyncio
 import math
@@ -13,6 +13,7 @@ from connector_sdk import (
     OAuthClientError,
     OAuthCredential,
     OAuthProtocol,
+    OAuthRequest,
     OAuthTokens,
     SecretRef,
     StaticOAuthClient,
@@ -39,6 +40,11 @@ def duration(value):
 
 
 class Protocol(OAuthProtocol):
+    def token_request(self, ctx, form):
+        payload = dict(form)
+        headers = self.authenticate(ctx, payload)
+        return OAuthRequest(json=payload, headers=headers)
+
     async def exchange(self, ctx, values):
         with scope("oauth_exchange"):
             emit("started")
@@ -124,7 +130,8 @@ class Protocol(OAuthProtocol):
 
 class Auth(OAuth2AuthorizationCode):
     authorize_url = "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
-    token_url = "https://accounts.feishu.cn/oauth/v3/token"
+    # The v1 authorization endpoint documents v2 for PKCE; use it for both grants.
+    token_url = "https://open.feishu.cn/open-apis/authen/v2/oauth/token"
     client = StaticOAuthClient(client_id=ConfigRef("app_id"),
                                client_secret=SecretRef("app_secret"),
                                token_endpoint_auth_method="client_secret_post")

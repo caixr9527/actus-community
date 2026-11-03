@@ -3,11 +3,11 @@
 import base64
 import hashlib
 import json
-from urllib.parse import parse_qs
 
 import httpx
 
 SCOPES = "offline_access docx:document:readonly wiki:wiki:readonly bitable:app"
+TOKEN_URL = "https://open.feishu.cn/open-apis/authen/v2/oauth/token"
 BASE = "/open-apis/bitable/v1/apps/base1/tables/table1"
 FIELDS = [
     {"field_name": "标题", "field_id": "fld1", "type": 1},
@@ -52,18 +52,26 @@ class Vendor:
             response = await self.inject(request)
             if response is not None:
                 return response
-        if request.url.host == "accounts.feishu.cn":
-            assert request.url.path == "/oauth/v3/token" and request.method == "POST"
-            assert request.headers["content-type"].startswith("application/x-www-form-urlencoded")
+        if str(request.url) == "https://accounts.feishu.cn/oauth/v3/token":
+            # Model the observed v1-authorize / v3-token PKCE compatibility failure.
+            return httpx.Response(400, json={"code": 20049})
+        if str(request.url) == TOKEN_URL:
+            assert request.method == "POST"
+            assert request.headers["content-type"] == "application/json"
             assert "authorization" not in request.headers
-            form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
+            assert not request.url.query
+            form = json.loads(request.content)
             assert form["client_id"] == "cli_test" and form["client_secret"] == "test-secret"
             self.tokens.append(form)
             if form["grant_type"] == "authorization_code":
                 assert form["redirect_uri"] == (
                     "https://backend.test/api/connector-oauth/callback")
-                digest = hashlib.sha256(form["code_verifier"].encode()).digest()
-                assert base64.urlsafe_b64encode(digest).rstrip(b"=").decode() == self.challenge
+                verifier = form.get("code_verifier", "")
+                digest = hashlib.sha256(verifier.encode()).digest()
+                challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+                if (not verifier or not self.challenge
+                        or challenge != self.challenge):
+                    return httpx.Response(400, json={"code": 20049})
             else:
                 assert form["grant_type"] == "refresh_token"
                 assert form["refresh_token"] == f"refresh-{self.generation}"

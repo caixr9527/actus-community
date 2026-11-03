@@ -5,7 +5,7 @@ import json
 
 import httpx
 import pytest
-from vendor import SCOPES, ok
+from vendor import SCOPES, TOKEN_URL, ok
 
 PREFIX = "ACTUS_DIAGNOSTIC_V1 "
 
@@ -47,7 +47,7 @@ async def test_invalid_material_has_precise_flags_but_still_fails(case, capfd, c
 
 async def test_provider_error_and_malformed_body_are_not_echoed(case, capfd):
     async def inject(request):
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             return httpx.Response(400, json={"code": 20002, "msg": "sensitive-provider-message"})
 
     case.vendor.inject = inject
@@ -58,7 +58,7 @@ async def test_provider_error_and_malformed_body_are_not_echoed(case, capfd):
     assert "sensitive-provider-message" not in json.dumps(records)
 
     async def malformed(request):
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             return httpx.Response(200, content=b"sensitive-not-json")
 
     case.vendor.inject = malformed
@@ -90,7 +90,7 @@ async def test_transport_failure_is_not_retried(case, capfd):
 
     async def inject(request):
         nonlocal calls
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             calls += 1
             raise httpx.ReadTimeout("sensitive-network-message")
 
@@ -108,7 +108,7 @@ async def test_concurrent_exchanges_have_separate_attempts(case, capfd):
 
     async def inject(request):
         nonlocal requests
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             requests += 1
             if requests == 2:
                 ready.set()
@@ -195,7 +195,7 @@ async def test_refresh_has_distinct_diagnostics_and_keeps_original_rules(case, c
 
 async def test_missing_provider_code_is_not_reported_as_zero(case, capfd):
     async def inject(request):
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             return httpx.Response(200, json={"access_token": "private-access",
                 "refresh_token": "private-refresh", "token_type": "Bearer", "scope": SCOPES,
                 "expires_in": 3600, "refresh_token_expires_in": 604800})

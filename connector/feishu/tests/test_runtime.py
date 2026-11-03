@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
-from vendor import SCOPES, ok
+from vendor import SCOPES, TOKEN_URL, ok
 
 
 async def test_oauth_s256_identity_replay_restart_disconnect(case):
@@ -90,6 +90,10 @@ async def test_refresh_rotation_serialized_and_persisted(case):
                                     for _ in range(4)))
     assert all(reply.status == "succeeded" for reply in replies), replies
     assert case.vendor.generation == 2
+    assert [form["grant_type"] for form in case.vendor.tokens] == [
+        "authorization_code", "refresh_token"]
+    assert set(case.vendor.tokens[1]) == {
+        "grant_type", "client_id", "client_secret", "refresh_token"}
     await case.stop()
     await case.reopen()
     assert (await case.invoke(connection, "list_wiki_spaces", {})).status == "succeeded"
@@ -107,13 +111,13 @@ async def test_refresh_failure_never_dispatches_business(case, status, code, exp
     await asyncio.sleep(1.05)
 
     async def inject(request):
-        if request.url.path == "/oauth/v3/token":
+        if str(request.url) == TOKEN_URL:
             return httpx.Response(status, json={"code": code, "error": "invalid_client"})
 
     case.vendor.inject = inject
     before = len(case.vendor.calls)
     assert (await case.invoke(connection, "list_wiki_spaces", {})).status == "failed"
-    assert all(r.url.host == "accounts.feishu.cn" for r in case.vendor.calls[before:])
+    assert all(str(r.url) == TOKEN_URL for r in case.vendor.calls[before:])
     live = await case.sdk.get_connection(connection.connection_id,
         **case.metadata("connection.read", connection_id=str(connection.connection_id)))
     assert live.data.status == expected
@@ -127,7 +131,7 @@ async def test_refresh_scope_reduction_stops_stale_capability_dispatch(case):
     before = len(case.vendor.calls)
     assert (await case.invoke(connection, "list_wiki_spaces", {})).status == "failed"
     assert case.vendor.generation == 2
-    assert all(r.url.host == "accounts.feishu.cn" for r in case.vendor.calls[before:])
+    assert all(str(r.url) == TOKEN_URL for r in case.vendor.calls[before:])
 
 
 async def test_credentials_and_vendor_error_bodies_do_not_leak(case, caplog):
@@ -173,6 +177,6 @@ async def test_missing_or_reused_rotating_refresh_result_is_never_replayed(case,
     before = len(case.vendor.calls)
     assert (await case.invoke(connection, "list_wiki_spaces", {})).status == "failed"
     assert len(case.vendor.calls) == before + 1
-    assert case.vendor.calls[-1].url.host == "accounts.feishu.cn"
+    assert str(case.vendor.calls[-1].url) == TOKEN_URL
     assert (await case.invoke(connection, "list_wiki_spaces", {})).status == "failed"
     assert len(case.vendor.calls) == before + 1

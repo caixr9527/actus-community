@@ -1,7 +1,7 @@
 # 飞书
 
 独立飞书 Connector，应用 ID `feishu`，包名 `actus-feishu`，入口
-`feishu_connector.app:App`。版本 `0.1.1`，使用公开 SDK `0.0.1b9`。
+`feishu_connector.app:App`。版本 `0.1.2`，使用公开 SDK `0.0.1b9`。
 用户 OAuth、文档读取、知识库浏览及多维表格单条记录读写；不依赖平台源码。
 
 ## 接入前准备
@@ -33,16 +33,24 @@
 
 ## 授权与连接
 
-使用官方推荐的 OAuth v3，替代已标记为历史版本的 v2：
+按授权入口文档的 PKCE 兼容说明，使用 v1 授权入口搭配 v2 Token 接口：
 
 - 授权：`https://accounts.feishu.cn/open-apis/authen/v1/authorize`
-- 交换和刷新：`https://accounts.feishu.cn/oauth/v3/token`
+- 交换和刷新：`https://open.feishu.cn/open-apis/authen/v2/oauth/token`
 - 身份：`GET https://open.feishu.cn/open-apis/authen/v1/user_info`
 
-通过公开 SDK `OAuthProtocol` 适配飞书业务错误和令牌响应，其余使用 SDK 标准流程。
-机密客户端使用 `client_secret_post`、表单编码和 PKCE S256。SDK 管理 state、
+通过公开 SDK `OAuthProtocol.token_request` 将交换和刷新编码为 JSON，复用公开
+`authenticate` 将 `client_id/client_secret` 放入请求体；不放入 URL 或业务 Bearer 头。
+机密客户端保留 `client_secret_post` 认证语义和 PKCE S256。SDK 管理 state、
 事务归属、加密保存、重放、重启恢复及刷新串行化。
 身份使用服务返回的 `tenant_key` 和应用内 `open_id`，不从 Token 推断账号。
+
+v2 Token 文档已推荐迁移 v3，但授权入口文档仍说明 PKCE 暂时搭配 v2；
+0.1.1 现场已记录 v3 返回 HTTP 400 / 20049。这里按该入口的兼容说明选择固定端点，
+不关闭 PKCE，不在失败后跨端点重试，也不复用授权码。
+升级后重新发起授权，不沿用旧授权链接、授权码或 v3 刷新凭据。
+真实租户仍须验证正确 PKCE 成功及错误校验值被拒绝；模拟厂商的严格校验不能证明
+飞书服务端实际执行了同等校验。完整依据和待验收项见 CONTRACTS.md、VALIDATION.md。
 
 实际授权范围以 Token 响应的 `scope` 为准，允许部分业务权限被裁剪；
 缺少 `offline_access` 或有效刷新凭据时连接失败。
@@ -151,7 +159,7 @@ PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL=
 
 ```sh
 <consumer>/bin/python -I -B <独立目录>/tests/acceptance.py \
-  <交付目录>/feishu-0.1.1.connector <全新验收输出目录>
+  <交付目录>/feishu-0.1.2.connector <全新验收输出目录>
 ```
 
 Runtime 的总截止时间与 HTTP 字节预算由宿主配置，应用解码单响应额外限制 1 MiB；

@@ -10,7 +10,7 @@
 | Notion | [notion](notion/README.md) | 0.1.6 / SDK 0.0.1b9；构建、独立安装及隔离测试通过，真实 Notion 与 UI 另验，未部署 |
 | 通用文件示例 | [file-demo](file-demo/README.md) | 0.1.3 / SDK 0.0.1b9；固定服务单文件上传下载、独立包及隔离任务链路通过，未部署 |
 | 百度网盘 | [baidu-netdisk](baidu-netdisk/README.md) | 0.1.1 / SDK 0.0.1b9；元数据标记解析修复、95 项测试及声明检查通过，构建、上传和升级由用户执行 |
-| 飞书 | [feishu](feishu/README.md) | 0.1.0 / SDK 0.0.1b9；100 项测试、独立构建安装、TLS 启动及静态复核通过，真实飞书与平台 UI 待验收，未部署 |
+| 飞书 | [feishu](feishu/README.md) | 0.1.2 / SDK 0.0.1b9；PKCE 令牌接口组合修复，119 项测试、独立构建安装及 TLS 启停通过，真实授权、PKCE 对照与平台 UI 待验收，未部署 |
 | GitHub | [github](github/README.md) | 0.1.0 / SDK 0.0.1b9；104 项测试、独立构建安装、TLS 启动及静态复核通过，真实 GitHub 与平台 UI 待验收，未部署 |
 | 钉钉 | [dingtalk](dingtalk/README.md) | 0.1.0 / SDK 0.0.1b9；122 项测试、独立构建安装、TLS 启动及静态复核通过，真实钉钉与平台 UI 待验收，未部署 |
 | 腾讯会议 | [tencent-meeting](tencent-meeting/README.md) | 0.1.0 / SDK 0.0.1b9；137 项本地测试、独立构建安装、TLS 启动及静态复核通过；授权后线上 Schema、回执与平台 UI 待验收，未部署 |

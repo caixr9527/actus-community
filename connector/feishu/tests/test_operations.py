@@ -199,6 +199,7 @@ async def test_cancelled_write_never_retries(case):
 @pytest.mark.parametrize("mode", ["http", "cycle", "duplicate", "unknown", "missing_options"])
 async def test_failed_schema_preflight_is_a_definite_no_write(case, mode):
     connection = await case.connect()
+    before = len(case.vendor.calls)
 
     async def inject(request):
         if request.url.path == BASE + "/fields":
@@ -216,7 +217,7 @@ async def test_failed_schema_preflight_is_a_definite_no_write(case, mode):
     reply = await case.invoke(connection, "create_record", TABLE | {"fields": {"状态": "进行中"}})
     assert reply.status == "failed" and reply.error.code == "operation_failed", reply
     assert not case.vendor.writes
-    assert all(r.method == "GET" for r in case.vendor.calls if r.url.host == "open.feishu.cn")
+    assert all(r.method == "GET" for r in case.vendor.calls[before:])
 
 
 @pytest.mark.parametrize("status,payload", [
