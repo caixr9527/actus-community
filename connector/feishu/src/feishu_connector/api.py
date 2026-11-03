@@ -50,8 +50,10 @@ def require(ctx, capability):
         raise OperationRejected()
 
 
-async def request(ctx, method, route, *, params=None, body=None):
+async def request(ctx, method, route, *, params=None, body=None, diagnostic=None):
     async def consume(response):
+        if diagnostic is not None:
+            diagnostic("observed", http_status=response.status_code)
         if response.status_code == 429:
             raise HttpError("feishu_rate_limited")
         if response.status_code in (401, 403):
@@ -60,6 +62,8 @@ async def request(ctx, method, route, *, params=None, body=None):
             raise HttpError("feishu_http_failed")
         payload = decode(await response.read())
         code = payload.get("code")
+        if diagnostic is not None:
+            diagnostic("observed", http_status=response.status_code, provider_code=code)
         if type(code) is not int:
             raise HttpError("feishu_invalid_response")
         if code != 0:

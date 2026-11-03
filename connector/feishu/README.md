@@ -1,7 +1,7 @@
 # 飞书
 
 独立飞书 Connector，应用 ID `feishu`，包名 `actus-feishu`，入口
-`feishu_connector.app:App`。版本 `0.1.0`，使用公开 SDK `0.0.1b9`。
+`feishu_connector.app:App`。版本 `0.1.1`，使用公开 SDK `0.0.1b9`。
 用户 OAuth、文档读取、知识库浏览及多维表格单条记录读写；不依赖平台源码。
 
 ## 接入前准备
@@ -52,6 +52,25 @@
 
 未声明远端撤销接口。断开清除本地连接，返回 `revocation.not_attempted`，
 不表示已在飞书端全局撤销。管理员更换应用身份或 Secret 后应按 SDK 绑定规则处理连接。
+
+### 授权诊断
+
+应用通过公开的 OAuth 扩展点向 stderr 输出可选的 `ACTUS_DIAGNOSTIC_V1` JSON 事件。
+覆盖令牌交换、令牌响应校验、刷新和身份查询；保持原有请求、校验、错误分类和凭据模型。
+事件只包含固定阶段、结果、HTTP 状态、已解析的数字业务错误码及布尔校验项。
+厂商未返回业务错误码时省略该字段，不把授权逻辑使用的默认值冒充厂商返回值。
+不输出授权码、state、Token、Secret、身份值、厂商消息、原始响应和异常正文。
+诊断失败不替换业务结果，不新增请求或自动重试，也不读取原本未消费的错误响应正文。
+
+交换与刷新各自生成独立 attempt_id，同一交换的响应沿用该标识，并发调用不会共享上下文。
+身份查询另使用公开 AuthContext 的事务标识；只有合法 UUID 请求标识才附带。
+SDK b9 的 OAuthContext 没有事务标识，应用不通过 SDK 私有字段补齐、不将诊断标识存入凭据，
+也不把不同阶段按时间强行归为同一事务。
+
+支持此格式的 Runtime 会校验并保留受限诊断文件；旧 Runtime 仍丢弃 stderr，
+因此只升级应用不能使旧容器立即可查询诊断。独立运行 CLI 时事件出现在 stderr。
+事件中的 succeeded 仅表示该应用步骤完成，最终连接结果仍以 SDK 授权事务为准。
+缺少日志不能证明没有请求；发送后超时也不能证明厂商未执行。
 
 ## 12 项操作
 
@@ -132,7 +151,7 @@ PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple PIP_EXTRA_INDEX_URL=
 
 ```sh
 <consumer>/bin/python -I -B <独立目录>/tests/acceptance.py \
-  <交付目录>/feishu-0.1.0.connector <全新验收输出目录>
+  <交付目录>/feishu-0.1.1.connector <全新验收输出目录>
 ```
 
 Runtime 的总截止时间与 HTTP 字节预算由宿主配置，应用解码单响应额外限制 1 MiB；

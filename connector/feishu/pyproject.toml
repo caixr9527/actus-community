@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actus-feishu"
-version = "0.1.0"
+version = "0.1.1"
 description = "Independent Feishu user OAuth, documents, wiki and Base connector"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -24,6 +24,7 @@ entrypoint = "feishu_connector.app:App"
 build-files = [
   "README.md", "src/feishu_connector/__init__.py", "src/feishu_connector/app.py",
   "src/feishu_connector/auth.py", "src/feishu_connector/api.py",
+  "src/feishu_connector/diagnostics.py",
   "src/feishu_connector/models.py", "src/feishu_connector/docs.py",
   "src/feishu_connector/wiki.py", "src/feishu_connector/bitable.py",
 ]
